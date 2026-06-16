@@ -29,13 +29,9 @@ public class MenuListener implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int ITEMS_PER_PAGE = 28;
 
-    // 玩家状态：主界面搜索词
     private static final Map<UUID, String> mainSearch = new HashMap<>();
-    // 玩家状态：主界面当前页码
     private static final Map<UUID, Integer> mainPage = new HashMap<>();
-    // 设置界面搜索词
     private static final Map<UUID, String> setupSearch = new HashMap<>();
-    // 设置界面页码
     private static final Map<UUID, Integer> setupPage = new HashMap<>();
 
     public MenuListener(WarpGUIPlugin plugin, WarpManager warpManager) {
@@ -43,7 +39,6 @@ public class MenuListener implements Listener {
         this.warpManager = warpManager;
     }
 
-    // ---------- 状态清理 ----------
     public static void clearPlayerState(UUID uuid) {
         mainSearch.remove(uuid);
         mainPage.remove(uuid);
@@ -58,7 +53,7 @@ public class MenuListener implements Listener {
         setupPage.clear();
     }
 
-    // ---------- 主界面打开 ----------
+    // ---------- 主界面 ----------
     public static void openMainMenu(Player player, WarpManager wm, int page, WarpGUIPlugin plugin) {
         UUID uuid = player.getUniqueId();
         String search = mainSearch.getOrDefault(uuid, null);
@@ -100,12 +95,10 @@ public class MenuListener implements Listener {
             inv.setItem(slots[i], item);
         }
 
-        // 工具栏
         inv.setItem(45, createGuiItem(plugin, Material.COMPASS, "search-item-name", "search-item-lore"));
         inv.setItem(49, createGuiItem(plugin, Material.NETHER_STAR, "create-item-name", "create-item-lore"));
         inv.setItem(53, createGuiItem(plugin, Material.WRITABLE_BOOK, "setup-item-name", "setup-item-lore"));
 
-        // 翻页按钮 (slot 36, 44)
         if (total > 1) {
             inv.setItem(36, createPageButton(plugin, true, page, total));
             inv.setItem(44, createPageButton(plugin, false, page, total));
@@ -116,12 +109,11 @@ public class MenuListener implements Listener {
         player.openInventory(inv);
     }
 
-    // 无 page 参数重载（外部调用，默认 page=1）
     public static void openMainMenu(Player player, WarpManager wm, WarpGUIPlugin plugin) {
         openMainMenu(player, wm, 1, plugin);
     }
 
-    // ---------- 设置界面打开 ----------
+    // ---------- 设置界面 ----------
     public static void openSetupMenu(Player player, WarpManager wm, WarpGUIPlugin plugin, int page) {
         UUID uuid = player.getUniqueId();
         String search = setupSearch.getOrDefault(uuid, null);
@@ -158,7 +150,6 @@ public class MenuListener implements Listener {
             inv.setItem(slots[i], item);
         }
 
-        // 工具栏：搜索（自己）、返回
         inv.setItem(45, createGuiItem(plugin, Material.COMPASS, "setup-search-item-name", "setup-search-item-lore"));
         inv.setItem(53, createGuiItem(plugin, Material.BARRIER, "back-item-name", "back-item-lore"));
 
@@ -295,7 +286,6 @@ public class MenuListener implements Listener {
                                         p.sendMessage(MM.deserialize(getMsg(plugin, "warp-created")
                                                 .replace("{name}", name).replace("{icon}", dName)
                                                 .replace("{public}", pub ? getGuiCfg(plugin, "public-status") : getGuiCfg(plugin, "private-status"))));
-                                        // 返回主界面，清除搜索状态
                                         mainSearch.remove(p.getUniqueId());
                                         openMainMenu(p, wm, 1, plugin);
                                     }
@@ -376,27 +366,26 @@ public class MenuListener implements Listener {
                 }
             } else if (slot == 45) openSetupSearchDialog(p, plugin);
             else if (slot == 53) {
-                // 返回主菜单，清除设置搜索状态
                 setupSearch.remove(p.getUniqueId());
                 openMainMenu(p, warpManager, 1, plugin);
             }
         }
     }
 
-    // ---------- UI 工具 ----------
-    private void setBorder(Inventory inv) {
+    // ---------- 静态工具方法 ----------
+    private static void setBorder(Inventory inv) {
         ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta gm = glass.getItemMeta();
         gm.displayName(Component.empty());
         glass.setItemMeta(gm);
-        for (int i = 0; i < 9; i++) inv.setItem(i, glass); // 顶部
+        for (int i = 0; i < 9; i++) inv.setItem(i, glass);
         for (int row = 1; row <= 4; row++) {
             inv.setItem(row * 9, glass);
             inv.setItem(row * 9 + 8, glass);
         }
     }
 
-    private int[] getContentSlots() {
+    private static int[] getContentSlots() {
         int[] slots = new int[28];
         int idx = 0;
         for (int row = 1; row <= 4; row++)
@@ -405,12 +394,12 @@ public class MenuListener implements Listener {
         return slots;
     }
 
-    private boolean isContentSlot(int slot) {
+    private static boolean isContentSlot(int slot) {
         int row = slot / 9, col = slot % 9;
         return row >= 1 && row <= 4 && col >= 1 && col <= 7;
     }
 
-    private ItemStack createGuiItem(WarpGUIPlugin plugin, Material mat, String nameKey, String loreKey) {
+    private static ItemStack createGuiItem(WarpGUIPlugin plugin, Material mat, String nameKey, String loreKey) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(MM.deserialize(getGuiCfg(plugin, nameKey)));
@@ -419,7 +408,7 @@ public class MenuListener implements Listener {
         return item;
     }
 
-    private ItemStack createPageButton(WarpGUIPlugin plugin, boolean prev, int page, int total) {
+    private static ItemStack createPageButton(WarpGUIPlugin plugin, boolean prev, int page, int total) {
         Material mat = Material.ARROW;
         String nameKey = prev ? "previous-page-name" : "next-page-name";
         String loreKey = prev ? "previous-page-lore" : "next-page-lore";
@@ -433,7 +422,7 @@ public class MenuListener implements Listener {
         return item;
     }
 
-    private ItemStack createPageIndicator(WarpGUIPlugin plugin, int page, int total) {
+    private static ItemStack createPageIndicator(WarpGUIPlugin plugin, int page, int total) {
         ItemStack item = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(MM.deserialize(getGuiCfg(plugin, "page-info-name")
@@ -444,7 +433,7 @@ public class MenuListener implements Listener {
         return item;
     }
 
-    private int getTotalFromItem(ItemStack item) {
+    private static int getTotalFromItem(ItemStack item) {
         if (item == null || !item.hasItemMeta() || item.getItemMeta().displayName() == null) return 1;
         String name = MM.serialize(item.getItemMeta().displayName());
         for (String part : name.split(" ")) {
@@ -455,13 +444,14 @@ public class MenuListener implements Listener {
         return 1;
     }
 
-    // 配置快捷读取
     static String getGuiCfg(WarpGUIPlugin plugin, String path) {
         return plugin.getConfig().getString("gui." + path, "");
     }
+
     private static String getDialogCfg(WarpGUIPlugin plugin, String path) {
         return plugin.getConfig().getString("dialog." + path, "");
     }
+
     static String getMsg(WarpGUIPlugin plugin, String path) {
         return plugin.getConfig().getString("messages." + path, "");
     }
