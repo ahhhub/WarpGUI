@@ -1,0 +1,21 @@
+name: WarpGUI
+version: 1.0
+main: com.warpgui.main.WarpGUIPlugin
+api-version: '1.21'
+commands:
+  warpgui:
+    description: 传送点主命令
+    permission: warpgui.gui.use
+permissions:
+  warpgui.gui.use:
+    description: 是否允许使用GUI
+    default: true
+  warpgui.gui.create:
+    description: 是否允许创建传送点
+    default: true
+  warpgui.gui.delete:
+    description: 是否可以删除自己的传送点
+    default: true
+  warpgui.gui.admin:
+    description: 拥有管理所有传送点的权限
+    default: op
