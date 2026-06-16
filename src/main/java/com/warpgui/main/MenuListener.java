@@ -29,10 +29,14 @@ public class MenuListener implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int ITEMS_PER_PAGE = 28;
 
-    private static final Map<UUID, String> mainSearch = new HashMap<>();
+    // 玩家状态（使用0-based页码）
     private static final Map<UUID, Integer> mainPage = new HashMap<>();
-    private static final Map<UUID, String> setupSearch = new HashMap<>();
+    private static final Map<UUID, Integer> mainTotalPages = new HashMap<>();
+    private static final Map<UUID, String> mainSearch = new HashMap<>();
+
     private static final Map<UUID, Integer> setupPage = new HashMap<>();
+    private static final Map<UUID, Integer> setupTotalPages = new HashMap<>();
+    private static final Map<UUID, String> setupSearch = new HashMap<>();
 
     public MenuListener(WarpGUIPlugin plugin, WarpManager warpManager) {
         this.plugin = plugin;
@@ -40,23 +44,28 @@ public class MenuListener implements Listener {
     }
 
     public static void clearPlayerState(UUID uuid) {
-        mainSearch.remove(uuid);
         mainPage.remove(uuid);
-        setupSearch.remove(uuid);
+        mainTotalPages.remove(uuid);
+        mainSearch.remove(uuid);
         setupPage.remove(uuid);
+        setupTotalPages.remove(uuid);
+        setupSearch.remove(uuid);
     }
 
     public static void clearAllPlayerStates() {
-        mainSearch.clear();
         mainPage.clear();
-        setupSearch.clear();
+        mainTotalPages.clear();
+        mainSearch.clear();
         setupPage.clear();
+        setupTotalPages.clear();
+        setupSearch.clear();
     }
 
-    // ---------- 主界面 ----------
+    // ==================== 主界面 ====================
     public static void openMainMenu(Player player, WarpManager wm, int page, WarpGUIPlugin plugin) {
         UUID uuid = player.getUniqueId();
         String search = mainSearch.getOrDefault(uuid, null);
+
         List<WarpData> filtered = new ArrayList<>();
         for (WarpData w : wm.getWarps()) {
             if (!w.isPublic() && !w.getCreatorUuid().equals(uuid) && !player.hasPermission("warpgui.gui.admin"))
@@ -66,13 +75,17 @@ public class MenuListener implements Listener {
             filtered.add(w);
         }
 
-        int total = Math.max(1, (int) Math.ceil((double) filtered.size() / ITEMS_PER_PAGE));
-        page = Math.max(1, Math.min(page, total));
+        int totalPages = filtered.isEmpty() ? 1 : (int) Math.ceil((double) filtered.size() / ITEMS_PER_PAGE);
+        if (totalPages < 1) totalPages = 1;
+        page = Math.max(0, Math.min(page, totalPages - 1));
+
         mainPage.put(uuid, page);
+        mainTotalPages.put(uuid, totalPages);
 
         Inventory inv = Bukkit.createInventory(null, GUI_SIZE, getGuiCfg(plugin, "main-menu-title"));
         setBorder(inv);
-        int start = (page - 1) * ITEMS_PER_PAGE;
+
+        int start = page * ITEMS_PER_PAGE;
         int end = Math.min(start + ITEMS_PER_PAGE, filtered.size());
         List<WarpData> pageItems = filtered.subList(start, end);
         int[] slots = getContentSlots();
@@ -95,28 +108,26 @@ public class MenuListener implements Listener {
             inv.setItem(slots[i], item);
         }
 
-        inv.setItem(45, createGuiItem(plugin, Material.COMPASS, "search-item-name", "search-item-lore"));
-        inv.setItem(49, createGuiItem(plugin, Material.NETHER_STAR, "create-item-name", "create-item-lore"));
-        inv.setItem(53, createGuiItem(plugin, Material.WRITABLE_BOOK, "setup-item-name", "setup-item-lore"));
-
-        if (total > 1) {
-            inv.setItem(36, createPageButton(plugin, true, page, total));
-            inv.setItem(44, createPageButton(plugin, false, page, total));
-        } else {
-            inv.setItem(36, createPageIndicator(plugin, page, total));
-        }
+        // 底部工具栏
+        inv.setItem(45, totalPages > 1 ? createPageButton(plugin, true, page, totalPages) : createPageIndicator(plugin, page, totalPages));
+        inv.setItem(46, createGuiItem(plugin, Material.COMPASS, "search-item-name", "search-item-lore"));
+        inv.setItem(48, createGuiItem(plugin, Material.NETHER_STAR, "create-item-name", "create-item-lore"));
+        inv.setItem(49, createPageIndicator(plugin, page, totalPages)); // 常驻页码
+        inv.setItem(51, createGuiItem(plugin, Material.WRITABLE_BOOK, "setup-item-name", "setup-item-lore"));
+        inv.setItem(53, totalPages > 1 ? createPageButton(plugin, false, page, totalPages) : createPageIndicator(plugin, page, totalPages));
 
         player.openInventory(inv);
     }
 
     public static void openMainMenu(Player player, WarpManager wm, WarpGUIPlugin plugin) {
-        openMainMenu(player, wm, 1, plugin);
+        openMainMenu(player, wm, 0, plugin);
     }
 
-    // ---------- 设置界面 ----------
+    // ==================== 个人设置界面 ====================
     public static void openSetupMenu(Player player, WarpManager wm, WarpGUIPlugin plugin, int page) {
         UUID uuid = player.getUniqueId();
         String search = setupSearch.getOrDefault(uuid, null);
+
         List<WarpData> own = new ArrayList<>();
         for (WarpData w : wm.getWarps()) {
             if (!w.getCreatorUuid().equals(uuid) && !player.hasPermission("warpgui.gui.admin")) continue;
@@ -125,13 +136,17 @@ public class MenuListener implements Listener {
             own.add(w);
         }
 
-        int total = Math.max(1, (int) Math.ceil((double) own.size() / ITEMS_PER_PAGE));
-        page = Math.max(1, Math.min(page, total));
+        int totalPages = own.isEmpty() ? 1 : (int) Math.ceil((double) own.size() / ITEMS_PER_PAGE);
+        if (totalPages < 1) totalPages = 1;
+        page = Math.max(0, Math.min(page, totalPages - 1));
+
         setupPage.put(uuid, page);
+        setupTotalPages.put(uuid, totalPages);
 
         Inventory inv = Bukkit.createInventory(null, GUI_SIZE, getGuiCfg(plugin, "setup-menu-title"));
         setBorder(inv);
-        int start = (page - 1) * ITEMS_PER_PAGE;
+
+        int start = page * ITEMS_PER_PAGE;
         int end = Math.min(start + ITEMS_PER_PAGE, own.size());
         List<WarpData> pageItems = own.subList(start, end);
         int[] slots = getContentSlots();
@@ -150,35 +165,35 @@ public class MenuListener implements Listener {
             inv.setItem(slots[i], item);
         }
 
-        inv.setItem(45, createGuiItem(plugin, Material.COMPASS, "setup-search-item-name", "setup-search-item-lore"));
-        inv.setItem(53, createGuiItem(plugin, Material.BARRIER, "back-item-name", "back-item-lore"));
-
-        if (total > 1) {
-            inv.setItem(36, createPageButton(plugin, true, page, total));
-            inv.setItem(44, createPageButton(plugin, false, page, total));
-        } else {
-            inv.setItem(36, createPageIndicator(plugin, page, total));
-        }
+        // 底部工具栏
+        inv.setItem(45, totalPages > 1 ? createPageButton(plugin, true, page, totalPages) : createPageIndicator(plugin, page, totalPages));
+        inv.setItem(46, createGuiItem(plugin, Material.COMPASS, "setup-search-item-name", "setup-search-item-lore"));
+        inv.setItem(49, createPageIndicator(plugin, page, totalPages));
+        inv.setItem(51, createGuiItem(plugin, Material.BARRIER, "back-item-name", "back-item-lore"));
+        inv.setItem(53, totalPages > 1 ? createPageButton(plugin, false, page, totalPages) : createPageIndicator(plugin, page, totalPages));
 
         player.openInventory(inv);
     }
 
     public static void openSetupMenu(Player player, WarpManager wm, WarpGUIPlugin plugin) {
-        openSetupMenu(player, wm, plugin, 1);
+        openSetupMenu(player, wm, plugin, 0);
     }
 
-    // ---------- 搜索对话框（全局）----------
+    // ==================== 全局搜索对话框 ====================
     public static void openSearchDialog(Player player, WarpGUIPlugin plugin) {
         Dialog dialog = Dialog.create(b -> b.empty()
                 .base(DialogBase.builder(MM.deserialize("<gold>" + getDialogCfg(plugin, "search-title") + "</gold>"))
                         .canCloseWithEscape(true)
-                        .body(List.of(DialogBody.plainMessage(MM.deserialize("<gray>" + getDialogCfg(plugin, "search-desc") + "</gray>"), 300)))
-                        .inputs(List.of(DialogInput.text("search_name", MM.deserialize("<yellow>" + getDialogCfg(plugin, "search-input-label") + "</yellow>")).build()))
-                        .build()
-                )
+                        .body(List.of(DialogBody.plainMessage(
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "search-desc") + "</gray>"), 300)))
+                        .inputs(List.of(DialogInput.text("search_name",
+                                MM.deserialize("<yellow>" + getDialogCfg(plugin, "search-input-label") + "</yellow>")).build()))
+                        .build())
                 .type(DialogType.multiAction(List.of(
-                        ActionButton.create(MM.deserialize("<green>" + getDialogCfg(plugin, "search-button") + "</green>"),
-                                MM.deserialize("<gray>" + getDialogCfg(plugin, "search-button-desc") + "</gray>"), 50,
+                        ActionButton.create(
+                                MM.deserialize("<green>" + getDialogCfg(plugin, "search-button") + "</green>"),
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "search-button-desc") + "</gray>"),
+                                50,
                                 DialogAction.customClick((view, audience) -> {
                                     if (audience instanceof Player p) {
                                         String text = view.getText("search_name");
@@ -188,34 +203,38 @@ public class MenuListener implements Listener {
                                             mainSearch.remove(p.getUniqueId());
                                         }
                                         mainPage.remove(p.getUniqueId());
-                                        openMainMenu(p, WarpGUIPlugin.getInstance().warpManager, 1, plugin);
+                                        openMainMenu(p, WarpGUIPlugin.getInstance().warpManager, 0, plugin);
                                     }
                                 }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES).lifetime(Duration.ofMinutes(5)).build())
                         ),
-                        ActionButton.create(MM.deserialize("<red>" + getDialogCfg(plugin, "cancel-button") + "</red>"),
-                                MM.deserialize("<gray>" + getDialogCfg(plugin, "cancel-desc") + "</gray>"), 50,
+                        ActionButton.create(
+                                MM.deserialize("<red>" + getDialogCfg(plugin, "cancel-button") + "</red>"),
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "cancel-desc") + "</gray>"),
+                                50,
                                 DialogAction.customClick((view, audience) -> {
-                                    if (audience instanceof Player p) {
-                                        openMainMenu(p, WarpGUIPlugin.getInstance().warpManager, 1, plugin);
-                                    }
+                                    if (audience instanceof Player p)
+                                        openMainMenu(p, WarpGUIPlugin.getInstance().warpManager, 0, plugin);
                                 }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES).lifetime(Duration.ofMinutes(5)).build())
                         )
                 ), null, 2)));
         player.showDialog(dialog);
     }
 
-    // ---------- 设置搜索对话框 ----------
+    // ==================== 个人设置搜索对话框 ====================
     public static void openSetupSearchDialog(Player player, WarpGUIPlugin plugin) {
         Dialog dialog = Dialog.create(b -> b.empty()
                 .base(DialogBase.builder(MM.deserialize("<gold>" + getDialogCfg(plugin, "setup-search-title") + "</gold>"))
                         .canCloseWithEscape(true)
-                        .body(List.of(DialogBody.plainMessage(MM.deserialize("<gray>" + getDialogCfg(plugin, "setup-search-desc") + "</gray>"), 300)))
-                        .inputs(List.of(DialogInput.text("search_name", MM.deserialize("<yellow>" + getDialogCfg(plugin, "search-input-label") + "</yellow>")).build()))
-                        .build()
-                )
+                        .body(List.of(DialogBody.plainMessage(
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "setup-search-desc") + "</gray>"), 300)))
+                        .inputs(List.of(DialogInput.text("search_name",
+                                MM.deserialize("<yellow>" + getDialogCfg(plugin, "search-input-label") + "</yellow>")).build()))
+                        .build())
                 .type(DialogType.multiAction(List.of(
-                        ActionButton.create(MM.deserialize("<green>" + getDialogCfg(plugin, "search-button") + "</green>"),
-                                MM.deserialize("<gray>" + getDialogCfg(plugin, "setup-search-button-desc") + "</gray>"), 50,
+                        ActionButton.create(
+                                MM.deserialize("<green>" + getDialogCfg(plugin, "search-button") + "</green>"),
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "setup-search-button-desc") + "</gray>"),
+                                50,
                                 DialogAction.customClick((view, audience) -> {
                                     if (audience instanceof Player p) {
                                         String text = view.getText("search_name");
@@ -225,52 +244,66 @@ public class MenuListener implements Listener {
                                             setupSearch.remove(p.getUniqueId());
                                         }
                                         setupPage.remove(p.getUniqueId());
-                                        openSetupMenu(p, WarpGUIPlugin.getInstance().warpManager, plugin, 1);
+                                        openSetupMenu(p, WarpGUIPlugin.getInstance().warpManager, plugin, 0);
                                     }
                                 }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES).lifetime(Duration.ofMinutes(5)).build())
                         ),
-                        ActionButton.create(MM.deserialize("<red>" + getDialogCfg(plugin, "cancel-button") + "</red>"),
-                                MM.deserialize("<gray>" + getDialogCfg(plugin, "cancel-desc") + "</gray>"), 50,
+                        ActionButton.create(
+                                MM.deserialize("<red>" + getDialogCfg(plugin, "cancel-button") + "</red>"),
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "cancel-desc") + "</gray>"),
+                                50,
                                 DialogAction.customClick((view, audience) -> {
-                                    if (audience instanceof Player p) {
-                                        openSetupMenu(p, WarpGUIPlugin.getInstance().warpManager, plugin, 1);
-                                    }
+                                    if (audience instanceof Player p)
+                                        openSetupMenu(p, WarpGUIPlugin.getInstance().warpManager, plugin, 0);
                                 }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES).lifetime(Duration.ofMinutes(5)).build())
                         )
                 ), null, 2)));
         player.showDialog(dialog);
     }
 
-    // ---------- 创建对话框 ----------
+    // ==================== 创建对话框（含非法字符检查） ====================
     public static void openCreateDialog(Player player, WarpGUIPlugin plugin) {
         Dialog dialog = Dialog.create(b -> b.empty()
                 .base(DialogBase.builder(MM.deserialize("<green>" + getDialogCfg(plugin, "create-title") + "</green>"))
                         .canCloseWithEscape(true)
-                        .body(List.of(DialogBody.plainMessage(MM.deserialize("<dark_gray>" + getDialogCfg(plugin, "create-icon-hint") + "</dark_gray>"), 200)))
+                        .body(List.of(DialogBody.plainMessage(
+                                MM.deserialize("<dark_gray>" + getDialogCfg(plugin, "create-icon-hint") + "</dark_gray>"), 200)))
                         .inputs(List.of(
-                                DialogInput.text("warp_name", MM.deserialize("<yellow>" + getDialogCfg(plugin, "create-name-label") + "</yellow>")).build(),
-                                DialogInput.text("warp_icon", MM.deserialize("<yellow>" + getDialogCfg(plugin, "create-icon-label") + "</yellow>")).build(),
-                                DialogInput.bool("warp_public", MM.deserialize("<yellow>" + getDialogCfg(plugin, "create-public-label") + "</yellow>")).build()
+                                DialogInput.text("warp_name",
+                                        MM.deserialize("<yellow>" + getDialogCfg(plugin, "create-name-label") + "</yellow>")).build(),
+                                DialogInput.text("warp_icon",
+                                        MM.deserialize("<yellow>" + getDialogCfg(plugin, "create-icon-label") + "</yellow>")).build(),
+                                DialogInput.bool("warp_public",
+                                        MM.deserialize("<yellow>" + getDialogCfg(plugin, "create-public-label") + "</yellow>")).build()
                         ))
-                        .build()
-                )
+                        .build())
                 .type(DialogType.multiAction(List.of(
-                        ActionButton.create(MM.deserialize("<green>" + getDialogCfg(plugin, "create-confirm-button") + "</green>"),
-                                MM.deserialize("<gray>" + getDialogCfg(plugin, "create-confirm-desc") + "</gray>"), 50,
+                        ActionButton.create(
+                                MM.deserialize("<green>" + getDialogCfg(plugin, "create-confirm-button") + "</green>"),
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "create-confirm-desc") + "</gray>"),
+                                50,
                                 DialogAction.customClick((view, audience) -> {
                                     if (audience instanceof Player p) {
                                         String name = view.getText("warp_name");
                                         String icon = view.getText("warp_icon");
                                         Boolean isPublic = view.getBoolean("warp_public");
+
                                         if (name == null || name.isEmpty()) {
                                             p.sendMessage(MM.deserialize(getMsg(plugin, "name-empty")));
                                             return;
                                         }
+                                        // 非法字符检查（只允许字母、数字、中文、下划线、连字符）
+                                        if (!name.matches("^[\\w\\u4e00-\\u9fff-]+$")) {
+                                            p.sendMessage(MM.deserialize(getMsg(plugin, "name-invalid")));
+                                            return;
+                                        }
+
                                         WarpManager wm = WarpGUIPlugin.getInstance().warpManager;
                                         if (wm.getWarp(name) != null) {
                                             p.sendMessage(MM.deserialize(getMsg(plugin, "warp-name-exists")));
                                             return;
                                         }
+
                                         String iconMat = "GRASS_BLOCK";
                                         LangManager lang = WarpGUIPlugin.getInstance().getLangManager();
                                         if (icon != null && !icon.isEmpty()) {
@@ -278,30 +311,36 @@ public class MenuListener implements Listener {
                                             if (m != null && m.isItem()) iconMat = m.name();
                                             else p.sendMessage(MM.deserialize(getMsg(plugin, "invalid-material")));
                                         }
+
                                         boolean pub = isPublic != null ? isPublic : true;
                                         WarpData newWarp = new WarpData(name, p.getUniqueId(), p.getName(), p.getLocation(), iconMat, pub);
                                         wm.createWarp(newWarp);
+
                                         Material created = Material.matchMaterial(iconMat);
                                         String dName = created != null ? lang.getDisplayName(created) : iconMat;
                                         p.sendMessage(MM.deserialize(getMsg(plugin, "warp-created")
                                                 .replace("{name}", name).replace("{icon}", dName)
                                                 .replace("{public}", pub ? getGuiCfg(plugin, "public-status") : getGuiCfg(plugin, "private-status"))));
+
                                         mainSearch.remove(p.getUniqueId());
-                                        openMainMenu(p, wm, 1, plugin);
+                                        openMainMenu(p, wm, 0, plugin);
                                     }
                                 }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES).lifetime(Duration.ofMinutes(5)).build())
                         ),
-                        ActionButton.create(MM.deserialize("<red>" + getDialogCfg(plugin, "cancel-button") + "</red>"),
-                                MM.deserialize("<gray>" + getDialogCfg(plugin, "cancel-desc") + "</gray>"), 50,
+                        ActionButton.create(
+                                MM.deserialize("<red>" + getDialogCfg(plugin, "cancel-button") + "</red>"),
+                                MM.deserialize("<gray>" + getDialogCfg(plugin, "cancel-desc") + "</gray>"),
+                                50,
                                 DialogAction.customClick((view, audience) -> {
-                                    if (audience instanceof Player p) openMainMenu(p, WarpGUIPlugin.getInstance().warpManager, 1, plugin);
+                                    if (audience instanceof Player p)
+                                        openMainMenu(p, WarpGUIPlugin.getInstance().warpManager, 0, plugin);
                                 }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES).lifetime(Duration.ofMinutes(5)).build())
                         )
                 ), null, 2)));
         player.showDialog(dialog);
     }
 
-    // ---------- 事件处理 ----------
+    // ==================== 事件处理 ====================
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
@@ -310,38 +349,43 @@ public class MenuListener implements Listener {
         if (slot < 0 || slot >= GUI_SIZE) return;
         e.setCancelled(true);
 
+        // 主界面
         if (title.equals(getGuiCfg(plugin, "main-menu-title"))) {
             if (isContentSlot(slot)) {
                 ItemStack clicked = e.getCurrentItem();
                 if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta().displayName() == null) return;
-                String name = MM.serialize(clicked.getItemMeta().displayName()).replace("<gold>","").replace("</gold>","").trim();
+                String name = MM.serialize(clicked.getItemMeta().displayName()).replace("<gold>", "").replace("</gold>", "").trim();
                 p.performCommand("warpgui tp " + name);
                 p.closeInventory();
-            } else if (slot == 36) {
-                if (e.getCurrentItem() != null && e.getCurrentItem().getType() == Material.ARROW) {
-                    int cur = mainPage.getOrDefault(p.getUniqueId(), 1);
-                    if (cur > 1) openMainMenu(p, warpManager, cur - 1, plugin);
-                }
-            } else if (slot == 44) {
-                if (e.getCurrentItem() != null && e.getCurrentItem().getType() == Material.ARROW) {
-                    int cur = mainPage.getOrDefault(p.getUniqueId(), 1);
-                    int total = getTotalFromItem(e.getCurrentItem());
-                    if (cur < total) openMainMenu(p, warpManager, cur + 1, plugin);
-                }
-            } else if (slot == 45) openSearchDialog(p, plugin);
-            else if (slot == 49) {
+                return;
+            }
+
+            UUID uuid = p.getUniqueId();
+            int curPage = mainPage.getOrDefault(uuid, 0);
+            int total = mainTotalPages.getOrDefault(uuid, 1);
+
+            if (slot == 45) { // 上一页
+                if (curPage > 0) openMainMenu(p, warpManager, curPage - 1, plugin);
+            } else if (slot == 53) { // 下一页
+                if (curPage < total - 1) openMainMenu(p, warpManager, curPage + 1, plugin);
+            } else if (slot == 46) { // 搜索
+                openSearchDialog(p, plugin);
+            } else if (slot == 48) { // 创建
                 if (!p.hasPermission("warpgui.gui.create")) {
                     p.sendMessage(MM.deserialize(getMsg(plugin, "no-create-permission")));
                     return;
                 }
                 openCreateDialog(p, plugin);
-            } else if (slot == 53) openSetupMenu(p, warpManager, plugin, 1);
+            } else if (slot == 51) { // 设置
+                openSetupMenu(p, warpManager, plugin, 0);
+            }
         }
+        // 设置界面
         else if (title.equals(getGuiCfg(plugin, "setup-menu-title"))) {
             if (isContentSlot(slot)) {
                 ItemStack clicked = e.getCurrentItem();
                 if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta().displayName() == null) return;
-                String name = MM.serialize(clicked.getItemMeta().displayName()).replace("<yellow>","").replace("</yellow>","").trim();
+                String name = MM.serialize(clicked.getItemMeta().displayName()).replace("<yellow>", "").replace("</yellow>", "").trim();
                 WarpData warp = warpManager.getWarp(name);
                 if (warp == null) return;
                 if (e.isLeftClick()) {
@@ -350,43 +394,44 @@ public class MenuListener implements Listener {
                     p.sendMessage(MM.deserialize(getMsg(plugin, "public-toggled")
                             .replace("{name}", warp.getName())
                             .replace("{status}", warp.isPublic() ? getGuiCfg(plugin, "public-status") : getGuiCfg(plugin, "private-status"))));
-                    int cur = setupPage.getOrDefault(p.getUniqueId(), 1);
-                    openSetupMenu(p, warpManager, plugin, cur);
+                    int curSetupPage = setupPage.getOrDefault(p.getUniqueId(), 0);
+                    openSetupMenu(p, warpManager, plugin, curSetupPage);
                 }
-            } else if (slot == 36) {
-                if (e.getCurrentItem() != null && e.getCurrentItem().getType() == Material.ARROW) {
-                    int cur = setupPage.getOrDefault(p.getUniqueId(), 1);
-                    if (cur > 1) openSetupMenu(p, warpManager, plugin, cur - 1);
-                }
-            } else if (slot == 44) {
-                if (e.getCurrentItem() != null && e.getCurrentItem().getType() == Material.ARROW) {
-                    int cur = setupPage.getOrDefault(p.getUniqueId(), 1);
-                    int total = getTotalFromItem(e.getCurrentItem());
-                    if (cur < total) openSetupMenu(p, warpManager, plugin, cur + 1);
-                }
-            } else if (slot == 45) openSetupSearchDialog(p, plugin);
-            else if (slot == 53) {
-                setupSearch.remove(p.getUniqueId());
-                openMainMenu(p, warpManager, 1, plugin);
+                return;
+            }
+
+            UUID uuid = p.getUniqueId();
+            int curPage = setupPage.getOrDefault(uuid, 0);
+            int total = setupTotalPages.getOrDefault(uuid, 1);
+
+            if (slot == 45) {
+                if (curPage > 0) openSetupMenu(p, warpManager, plugin, curPage - 1);
+            } else if (slot == 53) {
+                if (curPage < total - 1) openSetupMenu(p, warpManager, plugin, curPage + 1);
+            } else if (slot == 46) {
+                openSetupSearchDialog(p, plugin);
+            } else if (slot == 51) { // 返回
+                setupSearch.remove(uuid);
+                openMainMenu(p, warpManager, 0, plugin);
             }
         }
     }
 
-    // ---------- 静态工具方法 ----------
+    // ==================== 静态 UI 工具 ====================
     private static void setBorder(Inventory inv) {
         ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta gm = glass.getItemMeta();
         gm.displayName(Component.empty());
         glass.setItemMeta(gm);
-        for (int i = 0; i < 9; i++) inv.setItem(i, glass);
+        for (int i = 0; i < 9; i++) inv.setItem(i, glass); // top row
         for (int row = 1; row <= 4; row++) {
-            inv.setItem(row * 9, glass);
-            inv.setItem(row * 9 + 8, glass);
+            inv.setItem(row * 9, glass);     // left column
+            inv.setItem(row * 9 + 8, glass); // right column
         }
     }
 
     private static int[] getContentSlots() {
-        int[] slots = new int[28];
+        int[] slots = new int[ITEMS_PER_PAGE];
         int idx = 0;
         for (int row = 1; row <= 4; row++)
             for (int col = 1; col <= 7; col++)
@@ -409,13 +454,12 @@ public class MenuListener implements Listener {
     }
 
     private static ItemStack createPageButton(WarpGUIPlugin plugin, boolean prev, int page, int total) {
-        Material mat = Material.ARROW;
         String nameKey = prev ? "previous-page-name" : "next-page-name";
         String loreKey = prev ? "previous-page-lore" : "next-page-lore";
-        ItemStack item = new ItemStack(mat);
+        ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(MM.deserialize(getGuiCfg(plugin, nameKey)
-                .replace("{current}", String.valueOf(page))
+                .replace("{current}", String.valueOf(page + 1))
                 .replace("{total}", String.valueOf(total))));
         meta.lore(Arrays.asList(MM.deserialize(getGuiCfg(plugin, loreKey))));
         item.setItemMeta(meta);
@@ -426,24 +470,14 @@ public class MenuListener implements Listener {
         ItemStack item = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(MM.deserialize(getGuiCfg(plugin, "page-info-name")
-                .replace("{current}", String.valueOf(page))
+                .replace("{current}", String.valueOf(page + 1))
                 .replace("{total}", String.valueOf(total))));
         meta.lore(Collections.emptyList());
         item.setItemMeta(meta);
         return item;
     }
 
-    private static int getTotalFromItem(ItemStack item) {
-        if (item == null || !item.hasItemMeta() || item.getItemMeta().displayName() == null) return 1;
-        String name = MM.serialize(item.getItemMeta().displayName());
-        for (String part : name.split(" ")) {
-            if (part.contains("/")) {
-                try { return Integer.parseInt(part.split("/")[1]); } catch (NumberFormatException ignored) {}
-            }
-        }
-        return 1;
-    }
-
+    // ==================== 配置读取 ====================
     static String getGuiCfg(WarpGUIPlugin plugin, String path) {
         return plugin.getConfig().getString("gui." + path, "");
     }

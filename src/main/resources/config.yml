@@ -24,6 +24,7 @@ messages:
   world-not-loaded: "<red>目标世界未加载，无法传送。</red>"
   invalid-material: "<red>无效的材质名，已自动调整为 GRASS_BLOCK</red>"
   name-empty: "<red>名称不能为空！</red>"
+  name-invalid: "<red>名称包含非法字符！只允许字母、数字、中文、下划线和连字符。</red>"
   public-toggled: "<green>传送点 {name} 的状态已切换为: {status}</green>"
   usage-tp: "<red>用法: /warpgui tp <传送点名称></red>"
   usage-delete: "<red>用法: /warpgui delete <传送点名称></red>"
