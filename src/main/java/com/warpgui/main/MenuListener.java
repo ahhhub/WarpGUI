@@ -112,7 +112,7 @@ public class MenuListener implements Listener {
         inv.setItem(45, totalPages > 1 ? createPageButton(plugin, true, page, totalPages) : createPageIndicator(plugin, page, totalPages));
         inv.setItem(46, createGuiItem(plugin, Material.COMPASS, "search-item-name", "search-item-lore"));
         inv.setItem(48, createGuiItem(plugin, Material.NETHER_STAR, "create-item-name", "create-item-lore"));
-        inv.setItem(49, createPageIndicator(plugin, page, totalPages)); // 常驻页码
+        inv.setItem(49, createPageIndicator(plugin, page, totalPages));
         inv.setItem(51, createGuiItem(plugin, Material.WRITABLE_BOOK, "setup-item-name", "setup-item-lore"));
         inv.setItem(53, totalPages > 1 ? createPageButton(plugin, false, page, totalPages) : createPageIndicator(plugin, page, totalPages));
 
@@ -292,7 +292,6 @@ public class MenuListener implements Listener {
                                             p.sendMessage(MM.deserialize(getMsg(plugin, "name-empty")));
                                             return;
                                         }
-                                        // 非法字符检查（只允许字母、数字、中文、下划线、连字符）
                                         if (!name.matches("^[\\w\\u4e00-\\u9fff-]+$")) {
                                             p.sendMessage(MM.deserialize(getMsg(plugin, "name-invalid")));
                                             return;
@@ -340,17 +339,27 @@ public class MenuListener implements Listener {
         player.showDialog(dialog);
     }
 
-    // ==================== 事件处理 ====================
+    // ==================== 事件处理（已修复：只在自己的GUI中取消事件） ====================
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
+
         String title = e.getView().getTitle();
+        String mainTitle = getGuiCfg(plugin, "main-menu-title");
+        String setupTitle = getGuiCfg(plugin, "setup-menu-title");
+
+        // 不是我们的 GUI，不干预
+        if (!title.equals(mainTitle) && !title.equals(setupTitle)) {
+            return;
+        }
+
+        // 是我们的 GUI，取消事件并处理
+        e.setCancelled(true);
         int slot = e.getRawSlot();
         if (slot < 0 || slot >= GUI_SIZE) return;
-        e.setCancelled(true);
 
         // 主界面
-        if (title.equals(getGuiCfg(plugin, "main-menu-title"))) {
+        if (title.equals(mainTitle)) {
             if (isContentSlot(slot)) {
                 ItemStack clicked = e.getCurrentItem();
                 if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta().displayName() == null) return;
@@ -364,24 +373,24 @@ public class MenuListener implements Listener {
             int curPage = mainPage.getOrDefault(uuid, 0);
             int total = mainTotalPages.getOrDefault(uuid, 1);
 
-            if (slot == 45) { // 上一页
+            if (slot == 45) {
                 if (curPage > 0) openMainMenu(p, warpManager, curPage - 1, plugin);
-            } else if (slot == 53) { // 下一页
+            } else if (slot == 53) {
                 if (curPage < total - 1) openMainMenu(p, warpManager, curPage + 1, plugin);
-            } else if (slot == 46) { // 搜索
+            } else if (slot == 46) {
                 openSearchDialog(p, plugin);
-            } else if (slot == 48) { // 创建
+            } else if (slot == 48) {
                 if (!p.hasPermission("warpgui.gui.create")) {
                     p.sendMessage(MM.deserialize(getMsg(plugin, "no-create-permission")));
                     return;
                 }
                 openCreateDialog(p, plugin);
-            } else if (slot == 51) { // 设置
+            } else if (slot == 51) {
                 openSetupMenu(p, warpManager, plugin, 0);
             }
         }
         // 设置界面
-        else if (title.equals(getGuiCfg(plugin, "setup-menu-title"))) {
+        else if (title.equals(setupTitle)) {
             if (isContentSlot(slot)) {
                 ItemStack clicked = e.getCurrentItem();
                 if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta().displayName() == null) return;
@@ -410,7 +419,7 @@ public class MenuListener implements Listener {
                 if (curPage < total - 1) openSetupMenu(p, warpManager, plugin, curPage + 1);
             } else if (slot == 46) {
                 openSetupSearchDialog(p, plugin);
-            } else if (slot == 51) { // 返回
+            } else if (slot == 51) {
                 setupSearch.remove(uuid);
                 openMainMenu(p, warpManager, 0, plugin);
             }
@@ -423,10 +432,10 @@ public class MenuListener implements Listener {
         ItemMeta gm = glass.getItemMeta();
         gm.displayName(Component.empty());
         glass.setItemMeta(gm);
-        for (int i = 0; i < 9; i++) inv.setItem(i, glass); // top row
+        for (int i = 0; i < 9; i++) inv.setItem(i, glass);
         for (int row = 1; row <= 4; row++) {
-            inv.setItem(row * 9, glass);     // left column
-            inv.setItem(row * 9 + 8, glass); // right column
+            inv.setItem(row * 9, glass);
+            inv.setItem(row * 9 + 8, glass);
         }
     }
 
@@ -477,7 +486,6 @@ public class MenuListener implements Listener {
         return item;
     }
 
-    // ==================== 配置读取 ====================
     static String getGuiCfg(WarpGUIPlugin plugin, String path) {
         return plugin.getConfig().getString("gui." + path, "");
     }
